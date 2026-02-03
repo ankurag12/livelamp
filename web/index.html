@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LiveLamp Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            margin-bottom: 15px;
+            color: #667eea;
+            font-size: 1.5em;
+        }
+
+        /* Pump Control */
+        .pump-btn {
+            width: 100%;
+            padding: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #4CAF50;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .pump-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .pump-btn.on {
+            background: #45a049;
+        }
+
+        /* SMA Control */
+        .sma-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .sma-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .sma-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        .sma-slider::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+        }
+
+        .sma-value {
+            text-align: center;
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .sma-btn {
+            padding: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            background: #ff9800;
+            color: white;
+            transition: all 0.3s;
+        }
+
+        .sma-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* LED Color Picker */
+        .color-picker-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .color-input {
+            width: 100%;
+            height: 60px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        .color-preview {
+            width: 100%;
+            height: 80px;
+            border-radius: 10px;
+            border: 3px solid #ddd;
+            transition: all 0.3s;
+        }
+
+        .color-off-btn {
+            padding: 12px 25px;
+            font-size: 1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #f44336;
+            color: white;
+        }
+
+        /* Radar Sensor */
+        .radar-data {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .radar-item {
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .radar-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .radar-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .presence-indicator {
+            grid-column: 1 / -1;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1.3em;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .presence-indicator.detected {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .presence-indicator.not-detected {
+            background: #f44336;
+            color: white;
+        }
+
+        /* Status message */
+        .status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+
+        .status.success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .status.error {
+            background: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔆 LiveLamp Control</h1>
+
+        <!-- Pump Control -->
+        <div class="card">
+            <h2>💧 Pump Control</h2>
+            <button class="pump-btn" id="pumpBtn"
+                    onmousedown="pumpOn()"
+                    onmouseup="pumpOff()"
+                    ontouchstart="pumpOn()"
+                    ontouchend="pumpOff()">
+                Press & Hold to Activate
+            </button>
+            <div class="status" id="pumpStatus" style="display:none;"></div>
+        </div>
+
+        <!-- SMA Control -->
+        <div class="card">
+            <h2>⚡ SMA Wire Control</h2>
+            <div class="sma-controls">
+                <div class="sma-value"><span id="smaValue">0</span>%</div>
+                <input type="range" min="0" max="100" value="0" class="sma-slider" id="smaSlider">
+                <button class="sma-btn" id="smaBtn" onclick="activateSMA()">Activate SMA</button>
+            </div>
+            <div class="status" id="smaStatus" style="display:none;"></div>
+        </div>
+
+        <!-- LED Color Control -->
+        <div class="card">
+            <h2>💡 LED Color Control</h2>
+            <div class="color-picker-container">
+                <div class="color-preview" id="colorPreview"></div>
+                <input type="color" class="color-input" id="colorPicker" value="#ff0000">
+                <button class="color-off-btn" onclick="ledsOff()">Turn Off LEDs</button>
+            </div>
+            <div class="status" id="ledStatus" style="display:none;"></div>
+        </div>
+
+        <!-- Radar Sensor -->
+        <div class="card">
+            <h2>📡 Radar Sensor</h2>
+            <div class="radar-data">
+                <div class="presence-indicator not-detected" id="presenceIndicator">
+                    No Presence Detected
+                </div>
+                <div class="radar-item">
+                    <div class="radar-label">Target State</div>
+                    <div class="radar-value" id="targetState">-</div>
+                </div>
+                <div class="radar-item">
+                    <div class="radar-label">Detection Distance</div>
+                    <div class="radar-value"><span id="detectionDistance">0</span> cm</div>
+                </div>
+                <div class="radar-item">
+                    <div class="radar-label">Moving Energy</div>
+                    <div class="radar-value" id="movingEnergy">0</div>
+                </div>
+                <div class="radar-item">
+                    <div class="radar-label">Static Energy</div>
+                    <div class="radar-value" id="staticEnergy">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API base URL
+        const API_BASE = '';
+
+        // Pump Control
+        function pumpOn() {
+            fetch(`${API_BASE}/api/pump`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({on: true})
+            })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('pumpBtn').classList.add('on');
+                showStatus('pumpStatus', 'Pump ON', 'success');
+            })
+            .catch(err => showStatus('pumpStatus', 'Error: ' + err, 'error'));
+        }
+
+        function pumpOff() {
+            fetch(`${API_BASE}/api/pump`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({on: false})
+            })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('pumpBtn').classList.remove('on');
+                showStatus('pumpStatus', 'Pump OFF', 'success');
+            })
+            .catch(err => showStatus('pumpStatus', 'Error: ' + err, 'error'));
+        }
+
+        // SMA Control
+        const smaSlider = document.getElementById('smaSlider');
+        const smaValue = document.getElementById('smaValue');
+        const smaBtn = document.getElementById('smaBtn');
+
+        smaSlider.oninput = function() {
+            smaValue.textContent = this.value;
+        }
+
+        function activateSMA() {
+            const percent = parseInt(smaSlider.value);
+
+            fetch(`${API_BASE}/api/sma`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({percent: percent})
+            })
+            .then(r => r.json())
+            .then(data => {
+                showStatus('smaStatus', `SMA activated at ${percent}%`, 'success');
+
+                // Disable button for 5 seconds
+                smaBtn.disabled = true;
+                let countdown = 5;
+                smaBtn.textContent = `Wait ${countdown}s...`;
+
+                const timer = setInterval(() => {
+                    countdown--;
+                    if (countdown > 0) {
+                        smaBtn.textContent = `Wait ${countdown}s...`;
+                    } else {
+                        clearInterval(timer);
+                        smaBtn.disabled = false;
+                        smaBtn.textContent = 'Activate SMA';
+                    }
+                }, 1000);
+            })
+            .catch(err => showStatus('smaStatus', 'Error: ' + err, 'error'));
+        }
+
+        // LED Control
+        const colorPicker = document.getElementById('colorPicker');
+        const colorPreview = document.getElementById('colorPreview');
+
+        colorPicker.oninput = function() {
+            const hex = this.value;
+            colorPreview.style.backgroundColor = hex;
+
+            fetch(`${API_BASE}/api/leds`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({hex: hex})
+            })
+            .then(r => r.json())
+            .then(data => {
+                showStatus('ledStatus', 'Color updated', 'success');
+            })
+            .catch(err => showStatus('ledStatus', 'Error: ' + err, 'error'));
+        }
+
+        function ledsOff() {
+            fetch(`${API_BASE}/api/leds`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({hex: '#000000'})
+            })
+            .then(r => r.json())
+            .then(data => {
+                colorPreview.style.backgroundColor = '#000000';
+                colorPicker.value = '#000000';
+                showStatus('ledStatus', 'LEDs turned off', 'success');
+            })
+            .catch(err => showStatus('ledStatus', 'Error: ' + err, 'error'));
+        }
+
+        // Radar Sensor Update
+        function updateRadar() {
+            fetch(`${API_BASE}/api/radar`)
+            .then(r => r.json())
+            .then(data => {
+                const presenceIndicator = document.getElementById('presenceIndicator');
+
+                if (data.presence || data.presence_gpio) {
+                    presenceIndicator.textContent = '✓ Presence Detected';
+                    presenceIndicator.className = 'presence-indicator detected';
+                } else {
+                    presenceIndicator.textContent = '✗ No Presence';
+                    presenceIndicator.className = 'presence-indicator not-detected';
+                }
+
+                // Target state text
+                const stateText = ['No Target', 'Moving', 'Static', 'Both'];
+                document.getElementById('targetState').textContent =
+                    stateText[data.target_state] || 'Unknown';
+
+                document.getElementById('detectionDistance').textContent =
+                    data.detection_distance || 0;
+                document.getElementById('movingEnergy').textContent =
+                    data.moving_energy || 0;
+                document.getElementById('staticEnergy').textContent =
+                    data.static_energy || 0;
+            })
+            .catch(err => console.error('Radar update error:', err));
+        }
+
+        // Status message helper
+        function showStatus(elementId, message, type) {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.className = `status ${type}`;
+            el.style.display = 'block';
+
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 3000);
+        }
+
+        // Initialize color preview
+        colorPreview.style.backgroundColor = colorPicker.value;
+
+        // Update radar data every 500ms
+        setInterval(updateRadar, 500);
+
+        // Initial radar update
+        updateRadar();
+    </script>
+</body>
+</html>
