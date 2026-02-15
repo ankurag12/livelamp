@@ -46,8 +46,8 @@
             font-size: 1.5em;
         }
 
-        /* Pump Control */
-        .pump-btn {
+        /* Shared Control Button Style */
+        .control-btn {
             width: 100%;
             padding: 20px;
             font-size: 1.2em;
@@ -59,15 +59,22 @@
             background: #4CAF50;
             color: white;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            user-select: none;
+            -webkit-user-select: none;
         }
 
-        .pump-btn:active {
+        .control-btn:active:not(:disabled) {
             transform: scale(0.95);
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
-        .pump-btn.on {
-            background: #45a049;
+        .control-btn.active {
+            background: #f44336;
+        }
+
+        .control-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
 
         /* SMA Control */
@@ -110,23 +117,6 @@
             font-size: 2em;
             font-weight: bold;
             color: #667eea;
-        }
-
-        .sma-btn {
-            padding: 15px;
-            font-size: 1.1em;
-            font-weight: bold;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            background: #ff9800;
-            color: white;
-            transition: all 0.3s;
-        }
-
-        .sma-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
         }
 
         /* LED Color Picker */
@@ -237,25 +227,31 @@
         <!-- Pump Control -->
         <div class="card">
             <h2>💧 Pump Control</h2>
-            <button class="pump-btn" id="pumpBtn"
+            <button class="control-btn" id="pumpBtn"
                     onmousedown="pumpOn()"
                     onmouseup="pumpOff()"
+                    onmouseleave="pumpOff()"
                     ontouchstart="pumpOn()"
                     ontouchend="pumpOff()">
                 Press & Hold to Activate
             </button>
-            <div class="status" id="pumpStatus" style="display:none;"></div>
         </div>
 
         <!-- SMA Control -->
         <div class="card">
             <h2>⚡ SMA Wire Control</h2>
             <div class="sma-controls">
-                <div class="sma-value"><span id="smaValue">0</span>%</div>
-                <input type="range" min="0" max="100" value="0" class="sma-slider" id="smaSlider">
-                <button class="sma-btn" id="smaBtn" onclick="activateSMA()">Activate SMA</button>
+                <div class="sma-value"><span id="smaValue">50</span>%</div>
+                <input type="range" min="0" max="100" value="50" class="sma-slider" id="smaSlider">
+                <button class="control-btn" id="smaBtn"
+                        onmousedown="smaOn()"
+                        onmouseup="smaOff()"
+                        onmouseleave="smaOff()"
+                        ontouchstart="smaOn()"
+                        ontouchend="smaOff()">
+                    Press & Hold to Activate
+                </button>
             </div>
-            <div class="status" id="smaStatus" style="display:none;"></div>
         </div>
 
         <!-- LED Color Control -->
@@ -301,72 +297,89 @@
         const API_BASE = '';
 
         // Pump Control
+        const pumpBtn = document.getElementById('pumpBtn');
+
         function pumpOn() {
+            pumpBtn.classList.add('active');
+            pumpBtn.textContent = 'Pump Active - Release to Stop';
+
             fetch(`${API_BASE}/api/pump`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({on: true})
-            })
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('pumpBtn').classList.add('on');
-                showStatus('pumpStatus', 'Pump ON', 'success');
-            })
-            .catch(err => showStatus('pumpStatus', 'Error: ' + err, 'error'));
+            }).catch(err => console.error('Pump on error:', err));
         }
 
         function pumpOff() {
+            pumpBtn.classList.remove('active');
+            pumpBtn.textContent = 'Press & Hold to Activate';
+
             fetch(`${API_BASE}/api/pump`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({on: false})
-            })
-            .then(r => r.json())
-            .then(data => {
-                document.getElementById('pumpBtn').classList.remove('on');
-                showStatus('pumpStatus', 'Pump OFF', 'success');
-            })
-            .catch(err => showStatus('pumpStatus', 'Error: ' + err, 'error'));
+            }).catch(err => console.error('Pump off error:', err));
         }
 
         // SMA Control
+        const smaBtn = document.getElementById('smaBtn');
         const smaSlider = document.getElementById('smaSlider');
         const smaValue = document.getElementById('smaValue');
-        const smaBtn = document.getElementById('smaBtn');
+        let smaTimeout = null;
+        let smaCooldownTimer = null;
 
+        // Update slider display
         smaSlider.oninput = function() {
             smaValue.textContent = this.value;
         }
 
-        function activateSMA() {
+        function smaOn() {
+            // Don't activate if disabled (in cooldown)
+            if (smaBtn.disabled) {
+                return;
+            }
+
             const percent = parseInt(smaSlider.value);
+            smaBtn.classList.add('active');
+            smaBtn.textContent = 'SMA Active @ ' + percent + '% - Release to Stop';
 
             fetch(`${API_BASE}/api/sma`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({percent: percent})
-            })
-            .then(r => r.json())
-            .then(data => {
-                showStatus('smaStatus', `SMA activated at ${percent}%`, 'success');
+            }).catch(err => console.error('SMA on error:', err));
+        }
 
-                // Disable button for 5 seconds
-                smaBtn.disabled = true;
-                let countdown = 5;
-                smaBtn.textContent = `Wait ${countdown}s...`;
+        function smaOff() {
+            // Don't do anything if already disabled
+            if (smaBtn.disabled) {
+                return;
+            }
 
-                const timer = setInterval(() => {
-                    countdown--;
-                    if (countdown > 0) {
-                        smaBtn.textContent = `Wait ${countdown}s...`;
-                    } else {
-                        clearInterval(timer);
-                        smaBtn.disabled = false;
-                        smaBtn.textContent = 'Activate SMA';
-                    }
-                }, 1000);
-            })
-            .catch(err => showStatus('smaStatus', 'Error: ' + err, 'error'));
+            smaBtn.classList.remove('active');
+
+            // Turn off SMA
+            fetch(`${API_BASE}/api/sma`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({percent: 0})
+            }).catch(err => console.error('SMA off error:', err));
+
+            // Start 5-second cooldown
+            smaBtn.disabled = true;
+            let countdown = 5;
+            smaBtn.textContent = `Wait ${countdown}s...`;
+
+            smaCooldownTimer = setInterval(() => {
+                countdown--;
+                if (countdown > 0) {
+                    smaBtn.textContent = `Wait ${countdown}s...`;
+                } else {
+                    clearInterval(smaCooldownTimer);
+                    smaBtn.disabled = false;
+                    smaBtn.textContent = 'Press & Hold to Activate';
+                }
+            }, 1000);
         }
 
         // LED Control
