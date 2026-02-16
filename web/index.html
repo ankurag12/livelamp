@@ -119,32 +119,102 @@
             color: #667eea;
         }
 
-        /* LED Color Picker */
-        .color-picker-container {
+        /* LED Color Control */
+        .led-controls {
             display: flex;
             flex-direction: column;
+            gap: 20px;
+        }
+
+        .color-section {
+            display: flex;
             align-items: center;
             gap: 15px;
         }
 
         .color-input {
-            width: 100%;
-            height: 60px;
-            border: none;
+            width: 80px;
+            height: 80px;
+            border: 3px solid #ddd;
             border-radius: 10px;
             cursor: pointer;
         }
 
-        .color-preview {
-            width: 100%;
-            height: 80px;
-            border-radius: 10px;
-            border: 3px solid #ddd;
-            transition: all 0.3s;
+        .color-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
         }
 
-        .color-off-btn {
-            padding: 12px 25px;
+        .color-label {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .color-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .white-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .slider-title {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .slider-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+
+        .white-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: linear-gradient(to right, #333 0%, #fff 100%);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .white-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #ffd700;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .white-slider::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #ffd700;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .led-off-btn {
+            padding: 12px;
             font-size: 1em;
             font-weight: bold;
             border: none;
@@ -152,6 +222,11 @@
             cursor: pointer;
             background: #f44336;
             color: white;
+            transition: all 0.3s;
+        }
+
+        .led-off-btn:hover {
+            background: #d32f2f;
         }
 
         /* Radar Sensor */
@@ -257,12 +332,25 @@
         <!-- LED Color Control -->
         <div class="card">
             <h2>💡 LED Color Control</h2>
-            <div class="color-picker-container">
-                <div class="color-preview" id="colorPreview"></div>
-                <input type="color" class="color-input" id="colorPicker" value="#ff0000">
-                <button class="color-off-btn" onclick="ledsOff()">Turn Off LEDs</button>
+            <div class="led-controls">
+                <div class="color-section">
+                    <input type="color" class="color-input" id="colorPicker" value="#ff0000">
+                    <div class="color-info">
+                        <div class="color-label">RGB Color</div>
+                        <div class="color-value" id="colorValue">#FF0000</div>
+                    </div>
+                </div>
+
+                <div class="white-section">
+                    <div class="slider-label">
+                        <span class="slider-title">White Channel</span>
+                        <span class="slider-value"><span id="whiteValue">0</span>%</span>
+                    </div>
+                    <input type="range" min="0" max="100" value="0" class="white-slider" id="whiteSlider">
+                </div>
+
+                <button class="led-off-btn" onclick="ledsOff()">Turn Off All LEDs</button>
             </div>
-            <div class="status" id="ledStatus" style="display:none;"></div>
         </div>
 
         <!-- Radar Sensor -->
@@ -384,37 +472,79 @@
 
         // LED Control
         const colorPicker = document.getElementById('colorPicker');
-        const colorPreview = document.getElementById('colorPreview');
+        const colorValue = document.getElementById('colorValue');
+        const whiteSlider = document.getElementById('whiteSlider');
+        const whiteValue = document.getElementById('whiteValue');
 
+        let currentWhite = 0;
+        let colorDebounceTimer = null;
+        let whiteDebounceTimer = null;
+
+        // Update RGB color with debouncing
         colorPicker.oninput = function() {
-            const hex = this.value;
-            colorPreview.style.backgroundColor = hex;
+            const hex = this.value.toUpperCase();
+            colorValue.textContent = hex;
 
-            fetch(`${API_BASE}/api/leds`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({hex: hex})
-            })
-            .then(r => r.json())
-            .then(data => {
-                showStatus('ledStatus', 'Color updated', 'success');
-            })
-            .catch(err => showStatus('ledStatus', 'Error: ' + err, 'error'));
+            // Clear existing timer
+            if (colorDebounceTimer) {
+                clearTimeout(colorDebounceTimer);
+            }
+
+            // Wait 150ms after user stops picking color
+            colorDebounceTimer = setTimeout(() => {
+                fetch(`${API_BASE}/api/leds`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({hex: hex})
+                })
+                .catch(err => console.error('LED color error:', err));
+            }, 150);
+        }
+
+        // Update White channel with debouncing
+        whiteSlider.oninput = function() {
+            currentWhite = parseInt(this.value);
+            whiteValue.textContent = currentWhite;
+
+            // Clear existing timer
+            if (whiteDebounceTimer) {
+                clearTimeout(whiteDebounceTimer);
+            }
+
+            // Wait 150ms after user stops sliding
+            whiteDebounceTimer = setTimeout(() => {
+                fetch(`${API_BASE}/api/leds/white`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({brightness: Math.round(currentWhite * 2.55)})
+                })
+                .catch(err => console.error('LED white error:', err));
+            }, 150);
         }
 
         function ledsOff() {
+            // Reset UI
+            colorPicker.value = '#000000';
+            colorValue.textContent = '#000000';
+            whiteSlider.value = 0;
+            whiteValue.textContent = '0';
+            currentWhite = 0;
+
+            // Turn off RGB
             fetch(`${API_BASE}/api/leds`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({hex: '#000000'})
             })
-            .then(r => r.json())
-            .then(data => {
-                colorPreview.style.backgroundColor = '#000000';
-                colorPicker.value = '#000000';
-                showStatus('ledStatus', 'LEDs turned off', 'success');
+            .catch(err => console.error('LEDs off error:', err));
+
+            // Turn off White
+            fetch(`${API_BASE}/api/leds/white`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({brightness: 0})
             })
-            .catch(err => showStatus('ledStatus', 'Error: ' + err, 'error'));
+            .catch(err => console.error('LEDs off error:', err));
         }
 
         // Radar Sensor Update
@@ -446,21 +576,6 @@
             })
             .catch(err => console.error('Radar update error:', err));
         }
-
-        // Status message helper
-        function showStatus(elementId, message, type) {
-            const el = document.getElementById(elementId);
-            el.textContent = message;
-            el.className = `status ${type}`;
-            el.style.display = 'block';
-
-            setTimeout(() => {
-                el.style.display = 'none';
-            }, 3000);
-        }
-
-        // Initialize color preview
-        colorPreview.style.backgroundColor = colorPicker.value;
 
         // Update radar data every 500ms
         setInterval(updateRadar, 500);

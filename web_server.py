@@ -79,6 +79,15 @@ class WebServer:
                 return self.livelamp.leds.get_state()
             return {'error': 'Invalid request'}, 400
 
+        @self.app.route('/api/leds/white', methods=['POST'])
+        async def control_leds_white(request):
+            data = request.json
+            if data and 'brightness' in data:
+                brightness = data['brightness']
+                self.livelamp.leds.set_white(brightness)
+                return {'white': brightness}
+            return {'error': 'Invalid request'}, 400
+
         # Radar API endpoints
         @self.app.route('/api/radar', methods=['GET'])
         async def get_radar(request):

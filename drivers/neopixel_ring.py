@@ -1,29 +1,46 @@
 """
 Neopixel LED Ring Driver
-Supports RGB color control for Adafruit 12-LED Neopixel Ring
+Supports RGB and RGBW Neopixels
 """
 from machine import Pin
 import neopixel
 
 
 class NeopixelRing:
-    def __init__(self, pin, num_leds=12):
+    def __init__(self, pin, num_leds=12, rgbw=True):
         """
         Initialize Neopixel LED ring
 
         Args:
             pin: GPIO pin number for Neopixel data
             num_leds: Number of LEDs in the ring (default 12)
+            rgbw: True for RGBW LEDs, False for RGB LEDs (default True)
         """
         self.pin = pin
         self.num_leds = num_leds
-        self.np = neopixel.NeoPixel(Pin(pin), num_leds)
-        self._color = (0, 0, 0)  # Start off (black)
+        self.rgbw = rgbw
+
+        # RGBW needs 4 bytes per pixel, RGB needs 3
+        bpp = 4 if rgbw else 3
+        self.np = neopixel.NeoPixel(Pin(pin), num_leds, bpp=bpp)
+
+        self._color = (0, 0, 0)  # RGB color
+        self._white = 0  # White channel (0-255)
         self.clear()
+
+    def _update_leds(self):
+        """Internal method to update all LEDs with current RGB and W values"""
+        r, g, b = self._color
+        for i in range(self.num_leds):
+            if self.rgbw:
+                self.np[i] = (r, g, b, self._white)
+            else:
+                self.np[i] = (r, g, b)
+        self.np.write()
 
     def set_color(self, r, g, b):
         """
-        Set all LEDs to the same RGB color
+        Set all LEDs to the same RGB color (keeps W channel unchanged)
 
         Args:
             r: Red value 0-255
@@ -34,14 +51,11 @@ class NeopixelRing:
         g = max(0, min(255, g))
         b = max(0, min(255, b))
         self._color = (r, g, b)
-
-        for i in range(self.num_leds):
-            self.np[i] = (r, g, b)
-        self.np.write()
+        self._update_leds()
 
     def set_color_hex(self, hex_color):
         """
-        Set all LEDs using hex color string
+        Set all LEDs using hex color string (keeps W channel unchanged)
 
         Args:
             hex_color: Hex color string like "#FF5500" or "FF5500"
@@ -63,12 +77,33 @@ class NeopixelRing:
             b: Blue value 0-255
         """
         if 0 <= index < self.num_leds:
-            self.np[index] = (r, g, b)
+            if self.rgbw:
+                self.np[index] = (r, g, b, self._white)
+            else:
+                self.np[index] = (r, g, b)
             self.np.write()
 
+    def set_white(self, brightness):
+        """
+        Set white channel brightness (keeps RGB unchanged)
+
+        Args:
+            brightness: White brightness 0-255
+        """
+        if not self.rgbw:
+            # Fallback to RGB white for non-RGBW
+            self.set_color(brightness, brightness, brightness)
+            return
+
+        brightness = max(0, min(255, brightness))
+        self._white = brightness
+        self._update_leds()
+
     def clear(self):
-        """Turn off all LEDs"""
-        self.set_color(0, 0, 0)
+        """Turn off all LEDs (RGB and W)"""
+        self._color = (0, 0, 0)
+        self._white = 0
+        self._update_leds()
 
     def off(self):
         """Turn off all LEDs (alias for clear)"""
@@ -88,5 +123,6 @@ class NeopixelRing:
             "r": self._color[0],
             "g": self._color[1],
             "b": self._color[2],
-            "hex": self.get_color_hex()
+            "hex": self.get_color_hex(),
+            "white": self._white
         }
