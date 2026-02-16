@@ -114,15 +114,48 @@ class LiveLamp:
                 print(f"Error in sensor task: {e}")
                 await asyncio.sleep(1)
 
+    async def pattern_task(self):
+        """
+        Async task to render LED patterns
+        This runs concurrently with the web server and sensor task
+        """
+        print("Starting LED pattern rendering task...")
+        while True:
+            try:
+                # Render one frame of the current pattern
+                self.leds.render_pattern()
+
+                # Sleep based on pattern type for smooth animation
+                pattern = self.leds.get_pattern()
+                if pattern == 'solid':
+                    await asyncio.sleep_ms(100)  # Slow refresh for solid
+                elif pattern == 'breathe':
+                    await asyncio.sleep_ms(30)  # Breathe speed
+                elif pattern == 'fade':
+                    await asyncio.sleep_ms(50)  # Slow fade speed
+                elif pattern == 'rainbow':
+                    await asyncio.sleep_ms(50)  # Rainbow rotation speed
+                elif pattern == 'fire':
+                    await asyncio.sleep_ms(60)  # Slow warm glow transitions
+                elif pattern == 'dream':
+                    await asyncio.sleep_ms(30)  # Dream breathe+color speed
+                else:
+                    await asyncio.sleep_ms(100)  # Default
+
+            except Exception as e:
+                print(f"Error in pattern task: {e}")
+                await asyncio.sleep(1)
+
     async def start_tasks(self):
         """Start all async tasks"""
         # Create web server
         web_server = WebServer(self)
 
-        # Run web server and sensor task concurrently
+        # Run web server, sensor task, and pattern task concurrently
         await asyncio.gather(
             web_server.app.start_server(host=config.WEB_HOST, port=config.WEB_PORT, debug=True),
-            self.sensor_task()
+            self.sensor_task(),
+            self.pattern_task()
         )
 
     def run(self):

@@ -213,6 +213,49 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
 
+        /* LED Pattern Buttons */
+        .pattern-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .pattern-title {
+            font-size: 0.9em;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .pattern-buttons {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+        }
+
+        .pattern-btn {
+            aspect-ratio: 1;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            font-size: 2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .pattern-btn:hover {
+            background: #f5f5f5;
+            border-color: #667eea;
+        }
+
+        .pattern-btn.active {
+            background: #667eea;
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+
         .led-off-btn {
             padding: 12px;
             font-size: 1em;
@@ -347,6 +390,18 @@
                         <span class="slider-value"><span id="whiteValue">0</span>%</span>
                     </div>
                     <input type="range" min="0" max="100" value="0" class="white-slider" id="whiteSlider">
+                </div>
+
+                <div class="pattern-section">
+                    <div class="pattern-title">LED Patterns</div>
+                    <div class="pattern-buttons">
+                        <button class="pattern-btn active" data-pattern="solid" title="Solid" onclick="setPattern('solid')">⬤</button>
+                        <button class="pattern-btn" data-pattern="breathe" title="Breathe" onclick="setPattern('breathe')">◐</button>
+                        <button class="pattern-btn" data-pattern="fade" title="Fade" onclick="setPattern('fade')">🎨</button>
+                        <button class="pattern-btn" data-pattern="rainbow" title="Rainbow" onclick="setPattern('rainbow')">🌈</button>
+                        <button class="pattern-btn" data-pattern="fire" title="Fire" onclick="setPattern('fire')">🔥</button>
+                        <button class="pattern-btn" data-pattern="dream" title="Dream" onclick="setPattern('dream')">🔮</button>
+                    </div>
                 </div>
 
                 <button class="led-off-btn" onclick="ledsOff()">Turn Off All LEDs</button>
@@ -530,6 +585,9 @@
             whiteValue.textContent = '0';
             currentWhite = 0;
 
+            // Switch to solid pattern first (so multi-color patterns stop)
+            setPattern('solid');
+
             // Turn off RGB
             fetch(`${API_BASE}/api/leds`, {
                 method: 'POST',
@@ -545,6 +603,23 @@
                 body: JSON.stringify({brightness: 0})
             })
             .catch(err => console.error('LEDs off error:', err));
+        }
+
+        // LED Pattern Control
+        function setPattern(pattern) {
+            // Update active button
+            document.querySelectorAll('.pattern-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-pattern="${pattern}"]`).classList.add('active');
+
+            // Send pattern change to API
+            fetch(`${API_BASE}/api/leds/pattern`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({pattern: pattern})
+            })
+            .catch(err => console.error('Pattern error:', err));
         }
 
         // Radar Sensor Update

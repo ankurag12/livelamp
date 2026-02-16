@@ -88,6 +88,15 @@ class WebServer:
                 return {'white': brightness}
             return {'error': 'Invalid request'}, 400
 
+        @self.app.route('/api/leds/pattern', methods=['POST'])
+        async def control_leds_pattern(request):
+            data = request.json
+            if data and 'pattern' in data:
+                pattern = data['pattern']
+                self.livelamp.leds.set_pattern(pattern)
+                return self.livelamp.leds.get_state()
+            return {'error': 'Invalid request'}, 400
+
         # Radar API endpoints
         @self.app.route('/api/radar', methods=['GET'])
         async def get_radar(request):
